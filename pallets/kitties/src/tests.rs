@@ -18,10 +18,8 @@ fn it_works_for_create() {
 
 		let kitty = KittiesModule::kitties(kitty_id).unwrap();
 
-        //测试KittyCreated事件
-		System::assert_last_event(
-			Event::KittyCreated { who:1, kitty_id: kitty_id, kitty:kitty }.into(),
-		);
+		//测试KittyCreated事件
+		System::assert_last_event(Event::KittyCreated { who: 1, kitty_id, kitty }.into());
 
 		crate::NextKittyId::<Test>::set(crate::KittyId::max_value());
 		assert_noop!(
@@ -59,14 +57,14 @@ fn it_works_for_breed() {
 		assert_eq!(KittiesModule::kitties(breed_kitty_id).is_some(), true);
 		assert_eq!(KittiesModule::kitty_owner(breed_kitty_id), Some(account_id));
 		assert_eq!(KittiesModule::kitty_parents(breed_kitty_id), Some((kitty_id, kitty_id + 1)));
-        
-        let kitty = KittiesModule::kitties(breed_kitty_id).unwrap();
-        
-        //测试KittyBreed事件
+
+		let kitty = KittiesModule::kitties(breed_kitty_id).unwrap();
+
+		//测试KittyBreed事件
 		System::assert_last_event(
-			Event::KittyBreed { who:1, kitty_id: breed_kitty_id, kitty:kitty }.into(),
+			Event::KittyBreed { who: 1, kitty_id: breed_kitty_id, kitty }.into(),
 		);
-    })
+	})
 }
 
 #[test]
@@ -92,10 +90,9 @@ fn it_works_for_transfer() {
 
 		assert_eq!(KittiesModule::kitty_owner(kitty_id), Some(account_id));
 
-        
-        //测试KittyTransferred事件
+		//测试KittyTransferred事件
 		System::assert_last_event(
-			Event::KittyTransferred { who:2, recipient:1,kitty_id:kitty_id }.into(),
+			Event::KittyTransferred { who: 2, recipient: 1, kitty_id }.into(),
 		);
 	})
 }
