@@ -2,6 +2,15 @@ use crate::{mock::*, Error, Event};
 use frame_support::{assert_noop, assert_ok};
 use frame_system::ensure_signed;
 
+
+// #[test]
+// fn it_works_for_mock() {
+// 	new_test_ext().execute_with(|| {
+
+// 		assert_eq!(1, 1);
+// 	});
+// }
+
 #[test]
 fn it_works_for_create() {
 	new_test_ext().execute_with(|| {

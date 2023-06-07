@@ -1,6 +1,14 @@
 use crate as pallet_kitties;
-use frame_support::traits::{ConstU16, ConstU64};
+
+use pallet_balances;
 use pallet_insecure_randomness_collective_flip;
+
+use frame_support::{
+	construct_runtime, parameter_types,
+	traits::{ConstU128, ConstU16, ConstU64,ConstU32},
+	PalletId,
+};
+use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
@@ -20,6 +28,7 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		KittiesModule: pallet_kitties,
 		Randomness: pallet_insecure_randomness_collective_flip,
+		Balances: pallet_balances,
 	}
 );
 
@@ -41,7 +50,7 @@ impl frame_system::Config for Test {
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = ();
+	type AccountData = pallet_balances::AccountData<Balance>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -50,11 +59,38 @@ impl frame_system::Config for Test {
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
+parameter_types! {
+	pub KittyPalletId: PalletId = PalletId(*b"py/kitty");
+	pub KittyPrice: Balance=EXISTENTIAL_DEPOSIT*10;
+}
+
 impl pallet_kitties::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type Randomness = Randomness;
+	type Randomness=Randomness;
+	type Currency=Balances;
+	type KittyPrice =KittyPrice;
+	type PalletId = KittyPalletId;
 }
 impl pallet_insecure_randomness_collective_flip::Config for Test {}
+
+// pallet-balances
+pub type Balance = u128;
+pub const EXISTENTIAL_DEPOSIT: Balance = 500;
+impl pallet_balances::Config for Test {
+	type MaxLocks = ConstU32<50>;
+	type MaxReserves = ();
+	type ReserveIdentifier = [u8; 8];
+	type Balance = Balance;
+	type RuntimeEvent = RuntimeEvent;
+	type DustRemoval = ();
+	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+	type AccountStore = System;
+	type WeightInfo = pallet_balances::weights::SubstrateWeight<Test>;
+	type FreezeIdentifier = ();
+	type MaxFreezes = ();
+	type HoldIdentifier = ();
+	type MaxHolds = ();
+}
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut ext: sp_io::TestExternalities =
