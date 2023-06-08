@@ -1,8 +1,14 @@
-use crate::{mock::*, Error, Event};
-use frame_support::{assert_noop, assert_ok};
-use frame_system::ensure_signed;
+use crate::{mock::*, Error, Event, Kitty, KittyId, KittyName, NextKittyId};
+use frame_support::{assert_noop, assert_ok, pallet_prelude::DispatchResultWithPostInfo};
 
+const ACCOUNT_ID_1: AccountId = 1;
+const ACCOUNT_ID_2: AccountId = 2;
+const KITTY_ID_0: KittyId = 0;
+const KITTY_NAME: KittyName = *b"12345678";
 
+fn init_balance(account: AccountId, new_free: Balance) -> DispatchResultWithPostInfo {
+	Balances::force_set_balance(RuntimeOrigin::root(), account, new_free)
+}
 // #[test]
 // fn it_works_for_mock() {
 // 	new_test_ext().execute_with(|| {
@@ -14,94 +20,128 @@ use frame_system::ensure_signed;
 #[test]
 fn it_works_for_create() {
 	new_test_ext().execute_with(|| {
-		let kitty_id = 0;
-		let account_id = 1;
+		assert_ok!(init_balance(ACCOUNT_ID_1, 10_000_000));
 
-		assert_eq!(KittiesModule::next_kitty_id(), kitty_id);
-		assert_ok!(KittiesModule::create(RuntimeOrigin::signed(account_id)));
-		assert_eq!(KittiesModule::next_kitty_id(), kitty_id + 1);
+		let signer = RuntimeOrigin::signed(ACCOUNT_ID_1);
 
-		assert_eq!(KittiesModule::kitties(kitty_id).is_some(), true);
-		assert_eq!(KittiesModule::kitty_owner(kitty_id), Some(account_id));
-		assert_eq!(KittiesModule::kitty_parents(kitty_id), None);
+		// 检查初始状态
+		assert_eq!(KittiesModule::next_kitty_id(), KITTY_ID_0);
 
-		let kitty = KittiesModule::kitties(kitty_id).unwrap();
-
-		//测试KittyCreated事件
-		System::assert_last_event(Event::KittyCreated { who: 1, kitty_id, kitty }.into());
-
-		crate::NextKittyId::<Test>::set(crate::KittyId::max_value());
-		assert_noop!(
-			KittiesModule::create(RuntimeOrigin::signed(account_id)),
-			Error::<Test>::InvalidKittyId
+		// create kitty
+		assert_ok!(KittiesModule::create(signer.clone(), KITTY_NAME));
+		assert_eq!(KittiesModule::next_kitty_id(), KITTY_ID_0 + 1);
+		assert_eq!(KittiesModule::kitty_owner(KITTY_ID_0), Some(ACCOUNT_ID_1));
+		assert_eq!(KittiesModule::kitty_parents(KITTY_ID_0), None);
+		let kitty = Kitty { name: KITTY_NAME, dna: KittiesModule::random_value(&ACCOUNT_ID_1) };
+		assert_eq!(KittiesModule::kitties(KITTY_ID_0), Some(kitty.clone()));
+		System::assert_last_event(
+			Event::KittyCreated { who: ACCOUNT_ID_1, kitty_id: KITTY_ID_0, kitty }.into(),
 		);
+
+		// KittyId 溢出
+		NextKittyId::<Test>::set(KittyId::max_value());
+		assert_noop!(KittiesModule::create(signer, KITTY_NAME), Error::<Test>::InvalidKittyId,);
 	});
 }
 
 #[test]
 fn it_works_for_breed() {
 	new_test_ext().execute_with(|| {
-		let kitty_id = 0;
-		let account_id = 1;
+		assert_ok!(init_balance(ACCOUNT_ID_1, 10_000_000));
 
+		let signer = RuntimeOrigin::signed(ACCOUNT_ID_1);
+
+		let parent_id_0 = KITTY_ID_0;
+		let parent_id_1 = KITTY_ID_0 + 1;
+		let child_id = KITTY_ID_0 + 2;
+
+		// parent 相同
 		assert_noop!(
-			KittiesModule::breed(RuntimeOrigin::signed(account_id), kitty_id, kitty_id),
+			KittiesModule::breed(signer.clone(), parent_id_0, parent_id_0, KITTY_NAME),
 			Error::<Test>::SameKittyId
 		);
-
+		// parent 不存在
 		assert_noop!(
-			KittiesModule::breed(RuntimeOrigin::signed(account_id), kitty_id, kitty_id + 1),
+			KittiesModule::breed(signer.clone(), parent_id_0, parent_id_1, KITTY_NAME),
 			Error::<Test>::InvalidKittyId
 		);
 
-		assert_ok!(KittiesModule::create(RuntimeOrigin::signed(account_id)));
-		assert_ok!(KittiesModule::create(RuntimeOrigin::signed(account_id)));
+		// 创建两只Kitty作为parent
+		assert_ok!(KittiesModule::create(signer.clone(), KITTY_NAME));
+		assert_ok!(KittiesModule::create(signer.clone(), KITTY_NAME));
+		assert_eq!(KittiesModule::next_kitty_id(), child_id);
+		let parent_1 = Kitty { name: KITTY_NAME, dna: KittiesModule::random_value(&ACCOUNT_ID_1) };
+		let parent_2 = Kitty { name: KITTY_NAME, dna: KittiesModule::random_value(&ACCOUNT_ID_1) };
 
-		assert_eq!(KittiesModule::next_kitty_id(), kitty_id + 2);
-
-		assert_ok!(KittiesModule::breed(RuntimeOrigin::signed(account_id), kitty_id, kitty_id + 1));
-
-		let breed_kitty_id = 2;
-		assert_eq!(KittiesModule::next_kitty_id(), breed_kitty_id + 1);
-		assert_eq!(KittiesModule::kitties(breed_kitty_id).is_some(), true);
-		assert_eq!(KittiesModule::kitty_owner(breed_kitty_id), Some(account_id));
-		assert_eq!(KittiesModule::kitty_parents(breed_kitty_id), Some((kitty_id, kitty_id + 1)));
-
-		let kitty = KittiesModule::kitties(breed_kitty_id).unwrap();
-
-		//测试KittyBreed事件
+		// bred kitty
+		assert_ok!(KittiesModule::breed(signer, parent_id_0, parent_id_1, KITTY_NAME));
+		assert_eq!(KittiesModule::next_kitty_id(), child_id + 1);
+		assert_eq!(KittiesModule::kitty_owner(child_id), Some(ACCOUNT_ID_1));
+		assert_eq!(KittiesModule::kitty_parents(child_id), Some((parent_id_0, parent_id_1)));
+		let child = Kitty {
+			name: KITTY_NAME,
+			dna: KittiesModule::child_kitty_dna(&ACCOUNT_ID_1, &parent_1, &parent_2),
+		};
+		assert_eq!(KittiesModule::kitties(child_id), Some(child.clone()));
 		System::assert_last_event(
-			Event::KittyBreed { who: 1, kitty_id: breed_kitty_id, kitty }.into(),
+			Event::KittyBreed { who: ACCOUNT_ID_1, kitty_id: child_id, kitty: child }.into(),
 		);
-	})
+	});
 }
 
 #[test]
 fn it_works_for_transfer() {
 	new_test_ext().execute_with(|| {
-		let kitty_id = 0;
-		let account_id = 1;
-		let recipient = 2;
+		assert_ok!(init_balance(ACCOUNT_ID_1, 10_000_000));
+		assert_ok!(init_balance(ACCOUNT_ID_2, 10_000_000));
 
-		assert_ok!(KittiesModule::create(RuntimeOrigin::signed(account_id)));
-		assert_eq!(KittiesModule::kitty_owner(kitty_id), Some(account_id));
+		let signer = RuntimeOrigin::signed(ACCOUNT_ID_1);
+		let signer_2 = RuntimeOrigin::signed(ACCOUNT_ID_2);
 
+		// transfer 不存在的 kitty
 		assert_noop!(
-			KittiesModule::transfer(RuntimeOrigin::signed(recipient), account_id, kitty_id),
+			KittiesModule::transfer(signer.clone(), ACCOUNT_ID_2, KITTY_ID_0),
+			Error::<Test>::NoOwner
+		);
+
+		// create kitty
+		assert_ok!(KittiesModule::create(signer.clone(), KITTY_NAME));
+		assert_eq!(KittiesModule::kitty_owner(KITTY_ID_0), Some(ACCOUNT_ID_1));
+
+		// 非ower进行transfer
+		assert_noop!(
+			KittiesModule::transfer(signer_2.clone(), ACCOUNT_ID_1, KITTY_ID_0),
 			Error::<Test>::NotOwner
 		);
 
-		assert_ok!(KittiesModule::transfer(RuntimeOrigin::signed(account_id), recipient, kitty_id));
-
-		assert_eq!(KittiesModule::kitty_owner(kitty_id), Some(recipient));
-
-		assert_ok!(KittiesModule::transfer(RuntimeOrigin::signed(recipient), account_id, kitty_id));
-
-		assert_eq!(KittiesModule::kitty_owner(kitty_id), Some(account_id));
-
-		//测试KittyTransferred事件
-		System::assert_last_event(
-			Event::KittyTransferred { who: 2, recipient: 1, kitty_id }.into(),
+		// transfer 给 ower
+		assert_noop!(
+			KittiesModule::transfer(signer.clone(), ACCOUNT_ID_1, KITTY_ID_0),
+			Error::<Test>::TransferKittyToOwner
 		);
-	})
+
+		// transfer 1 -> 2
+		assert_ok!(KittiesModule::transfer(signer, ACCOUNT_ID_2, KITTY_ID_0));
+		assert_eq!(KittiesModule::kitty_owner(KITTY_ID_0), Some(ACCOUNT_ID_2));
+		System::assert_last_event(
+			Event::KittyTransferred {
+				who: ACCOUNT_ID_1,
+				recipient: ACCOUNT_ID_2,
+				kitty_id: KITTY_ID_0,
+			}
+			.into(),
+		);
+
+		// transfer 2 -> 1
+		assert_ok!(KittiesModule::transfer(signer_2, ACCOUNT_ID_1, KITTY_ID_0));
+		assert_eq!(KittiesModule::kitty_owner(KITTY_ID_0), Some(ACCOUNT_ID_1));
+		System::assert_last_event(
+			Event::KittyTransferred {
+				who: ACCOUNT_ID_2,
+				recipient: ACCOUNT_ID_1,
+				kitty_id: KITTY_ID_0,
+			}
+			.into(),
+		);
+	});
 }

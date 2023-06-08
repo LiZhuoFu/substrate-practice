@@ -5,7 +5,7 @@ use pallet_insecure_randomness_collective_flip;
 
 use frame_support::{
 	construct_runtime, parameter_types,
-	traits::{ConstU128, ConstU16, ConstU64,ConstU32},
+	traits::{ConstU128, ConstU16, ConstU32, ConstU64},
 	PalletId,
 };
 use frame_system as system;
@@ -31,7 +31,7 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances,
 	}
 );
-
+pub type AccountId = u64;
 impl frame_system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = ();
@@ -43,7 +43,7 @@ impl frame_system::Config for Test {
 	type BlockNumber = u64;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type AccountId = u64;
+	type AccountId = AccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
 	type RuntimeEvent = RuntimeEvent;
@@ -66,9 +66,9 @@ parameter_types! {
 
 impl pallet_kitties::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type Randomness=Randomness;
-	type Currency=Balances;
-	type KittyPrice =KittyPrice;
+	type Randomness = Randomness;
+	type Currency = Balances;
+	type KittyPrice = KittyPrice;
 	type PalletId = KittyPalletId;
 }
 impl pallet_insecure_randomness_collective_flip::Config for Test {}
