@@ -5,9 +5,8 @@
 // Make the WASM binary available.
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
-use pallet_insecure_randomness_collective_flip;
+
 use pallet_grandpa::AuthorityId as GrandpaId;
-use pallet_kitties::Kitty;
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
@@ -17,20 +16,18 @@ use sp_runtime::{
 		AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, One, Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, MultiSignature,
+	ApplyExtrinsicResult, MultiSignature, 
 };
-
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
-	construct_runtime, parameter_types,PalletId,
+	construct_runtime, parameter_types,
 	traits::{
-		ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, StorageInfo,
+		ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, Randomness, StorageInfo,
 	},
 	weights::{
 		constants::{
@@ -38,7 +35,7 @@ pub use frame_support::{
 		},
 		IdentityFee, Weight,
 	},
-	StorageValue,
+	StorageValue,PalletId,
 };
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
@@ -50,8 +47,6 @@ pub use sp_runtime::{Perbill, Permill};
 
 /// Import the template pallet.
 pub use pallet_template;
-pub use pallet_poe;
-pub use pallet_kitties;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -108,7 +103,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	//   `spec_version`, and `authoring_version` are the same between Wasm and native.
 	// This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 	//   the compatible custom types.
-	spec_version: 200,
+	spec_version: 203,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -248,10 +243,6 @@ impl pallet_balances::Config for Runtime {
 	type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
 	type AccountStore = System;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-	type FreezeIdentifier = ();
-	type MaxFreezes = ();
-	type HoldIdentifier = ();
-	type MaxHolds = ();
 }
 
 parameter_types! {
@@ -275,26 +266,24 @@ impl pallet_sudo::Config for Runtime {
 /// Configure the pallet-template in pallets/template.
 impl pallet_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = pallet_template::weights::SubstrateWeight<Runtime>;
-}
-impl pallet_poe::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type MaxClaimLength = ConstU32<512>;
 }
 
+impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
+
 parameter_types! {
+	// pub KittyPalletId: PalletId = PalletId(*b"py/kitty");
 	pub KittyPalletId: PalletId = PalletId(*b"py/kitty");
-	pub KittyPrice: Balance=EXISTENTIAL_DEPOSIT*10;
+	pub KittyPrice: Balance = EXISTENTIAL_DEPOSIT * 10;
 }
 
 impl pallet_kitties::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type Randomness=Randomness;
-	type Currency=Balances;
-	type KittyPrice =KittyPrice;
+	type Randomness = RandomnessCollectiveFlip;
+	type Currency = Balances;
+	type KittyPrice = KittyPrice;
 	type PalletId = KittyPalletId;
 }
-impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
@@ -312,9 +301,9 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		PoeModule: pallet_poe,
-		KittiesModule: pallet_kitties,
-		Randomness: pallet_insecure_randomness_collective_flip,
+		KittyModule: pallet_kitties,
+		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
+
 	}
 );
 
@@ -383,14 +372,6 @@ impl_runtime_apis! {
 	impl sp_api::Metadata<Block> for Runtime {
 		fn metadata() -> OpaqueMetadata {
 			OpaqueMetadata::new(Runtime::metadata().into())
-		}
-
-		fn metadata_at_version(version: u32) -> Option<OpaqueMetadata> {
-			Runtime::metadata_at_version(version)
-		}
-
-		fn metadata_versions() -> sp_std::vec::Vec<u32> {
-			Runtime::metadata_versions()
 		}
 	}
 
