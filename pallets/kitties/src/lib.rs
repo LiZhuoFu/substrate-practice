@@ -144,7 +144,12 @@ pub mod pallet {
 
 			let price = T::KittyPrice::get();
 			// T::Currency::reserve(&who, price)?;
-			T::Currency::transfer(&who, &Self::get_account_id(), price, ExistenceRequirement::KeepAlive)?;
+			T::Currency::transfer(
+				&who,
+				&Self::get_account_id(),
+				price,
+				ExistenceRequirement::KeepAlive,
+			)?;
 
 			Kitties::<T>::insert(kitty_id, &kitty);
 			KittyOwner::<T>::insert(kitty_id, &who);
@@ -183,7 +188,12 @@ pub mod pallet {
 
 			let price = T::KittyPrice::get();
 			// T::Currency::reserve(&who, price)?;
-			T::Currency::transfer(&who, &Self::get_account_id(), price, ExistenceRequirement::KeepAlive)?;
+			T::Currency::transfer(
+				&who,
+				&Self::get_account_id(),
+				price,
+				ExistenceRequirement::KeepAlive,
+			)?;
 
 			Kitties::<T>::insert(kitty_id, &kitty);
 			KittyOwner::<T>::insert(kitty_id, &who);
@@ -277,6 +287,18 @@ pub mod pallet {
 		//get account id from pallet id
 		fn get_account_id() -> T::AccountId{
 			T::PalletId::get().into_account_truncating()
+		}
+		pub fn child_kitty_dna(
+			account: &T::AccountId,
+			parent_1: &Kitty,
+			parent_2: &Kitty,
+		) -> KittyDna {
+			let selector = Self::random_value(&account);
+			let mut dna = KittyDna::default();
+			for i in 0..parent_1.dna.len() {
+				dna[i] = (parent_1.dna[i] & selector[i]) | (parent_2.dna[i] & !selector[i])
+			}
+			return dna
 		}
 	}
 }
